@@ -99,6 +99,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
   }
 
+  Future<void> _enterVolunteerCode() async {
+    final code = await showDialog<String>(
+      context: context,
+      builder: (_) => const _VolunteerCodeDialog(),
+    );
+    if (code == null || code.trim().isEmpty) return;
+
+    setState(() => _busy = true);
+    try {
+      final event = await _api.joinAsVolunteer(widget.eventId, code.trim());
+      if (!mounted) return;
+      setState(() => _event = event);
+      showSnackBar("You're a volunteer now. Open the Volunteer tab to scan.",
+          Colors.green, context,
+          duration: const Duration(seconds: 3));
+    } catch (e) {
+      if (!mounted) return;
+      showSnackBar(userFacingApiError(e, fallback: 'Could not verify the code'),
+          Colors.red, context,
+          duration: const Duration(seconds: 2));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final event = _event;
@@ -212,6 +237,15 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             ),
           const SizedBox(height: 12),
           _buildRegistrationSection(event),
+          if (!event.isVolunteer) ...[
+            const SizedBox(height: 24),
+            TextButton.icon(
+              onPressed: _busy ? null : _enterVolunteerCode,
+              icon: const Icon(Icons.badge_outlined, size: 18),
+              label: const Text('Volunteering? Enter access code'),
+              style: TextButton.styleFrom(foregroundColor: AppUi.textSecondary),
+            ),
+          ],
         ],
       ),
     );
@@ -462,6 +496,50 @@ class _VolunteerTabState extends State<_VolunteerTab> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VolunteerCodeDialog extends StatefulWidget {
+  const _VolunteerCodeDialog();
+
+  @override
+  State<_VolunteerCodeDialog> createState() => _VolunteerCodeDialogState();
+}
+
+class _VolunteerCodeDialogState extends State<_VolunteerCodeDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Volunteer access code'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        textCapitalization: TextCapitalization.characters,
+        decoration: const InputDecoration(
+          hintText: 'e.g. K7XQ9M',
+          helperText: 'Get this code from the event organisers.',
+        ),
+        onSubmitted: (value) => Navigator.pop(context, value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Continue'),
+        ),
+      ],
     );
   }
 }

@@ -14,7 +14,7 @@ import {
   Typography,
   message,
 } from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, ReloadOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import EventForm from "../components/EventForm";
@@ -24,6 +24,7 @@ import {
   getEvent,
   listRegistrations,
   rejectRegistration,
+  setVolunteerCode,
   setVolunteers,
   updateEvent,
 } from "../apis/events";
@@ -48,6 +49,8 @@ export default function EventDetailPage() {
   const [saving, setSaving] = useState(false);
   const [volunteerInput, setVolunteerInput] = useState("");
   const [savingVolunteers, setSavingVolunteers] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [savingCode, setSavingCode] = useState(false);
 
   const loadEvent = useCallback(async () => {
     try {
@@ -152,6 +155,20 @@ export default function EventDetailPage() {
       message.error(err.message || "Failed to update volunteers");
     } finally {
       setSavingVolunteers(false);
+    }
+  };
+
+  const handleSetCode = async (code) => {
+    setSavingCode(true);
+    try {
+      const data = await setVolunteerCode(eventId, code);
+      setEvent((prev) => ({ ...prev, volunteerCode: data.volunteerCode }));
+      setCodeInput("");
+      message.success(`Access code is now ${data.volunteerCode}`);
+    } catch (err) {
+      message.error(err.message || "Failed to update access code");
+    } finally {
+      setSavingCode(false);
     }
   };
 
@@ -300,8 +317,50 @@ export default function EventDetailPage() {
 
       <Card title="Volunteers">
         <Text type="secondary" className="block mb-2">
-          Roll numbers of students who can scan entry QRs for this event, one
-          per line. They'll see a Volunteer tab on this event in the app.
+          Share this access code with your volunteers. Anyone who enters it on
+          this event in the app gets the Volunteer tab and can scan entry QRs.
+        </Text>
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <Text
+            copyable={{ text: event.volunteerCode }}
+            className="!text-2xl font-mono tracking-widest"
+          >
+            {event.volunteerCode || "—"}
+          </Text>
+          <Space.Compact>
+            <Input
+              placeholder="Set your own code"
+              value={codeInput}
+              onChange={(e) => setCodeInput(e.target.value)}
+              onPressEnter={() => codeInput.trim() && handleSetCode(codeInput)}
+              style={{ width: 200 }}
+            />
+            <Button
+              loading={savingCode}
+              disabled={!codeInput.trim()}
+              onClick={() => handleSetCode(codeInput)}
+            >
+              Save
+            </Button>
+          </Space.Compact>
+          <Button
+            icon={<ReloadOutlined />}
+            loading={savingCode}
+            onClick={() =>
+              Modal.confirm({
+                title: "Generate a new access code?",
+                content:
+                  "The old code stops working. Existing volunteers keep access.",
+                onOk: () => handleSetCode(),
+              })
+            }
+          >
+            Generate new
+          </Button>
+        </div>
+        <Text type="secondary" className="block mb-2">
+          Current volunteers, by roll number (one per line). You can also add
+          or remove volunteers here directly.
         </Text>
         <Input.TextArea
           rows={4}

@@ -2,7 +2,7 @@ import { test, describe, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import mongoose from "mongoose";
 
-import { Event } from "../modules/event/eventModel.js";
+import { Event, generateVolunteerCode } from "../modules/event/eventModel.js";
 import { EventRegistration } from "../modules/event/eventRegistrationModel.js";
 import * as svc from "../modules/event/eventService.js";
 
@@ -276,5 +276,60 @@ describe("toStudentEvent", () => {
     const approved = svc.toStudentEvent(event, { event: event._id, status: "approved", qrToken: token }, userId);
     assert.equal(approved.myRegistration.qrPayload, svc.buildQrPayload(event._id, token));
     assert.equal(approved.isVolunteer, false);
+  });
+});
+
+describe("volunteer access code", () => {
+  let event;
+  beforeEach(() => {
+    event = makeEvent({ volunteerCode: "K7XQ9M" });
+    mock.method(Event, "findById", async () => event);
+  });
+
+  test("generated codes are 6 unambiguous characters", () => {
+    for (let i = 0; i < 50; i++) {
+      assert.match(generateVolunteerCode(), /^[A-HJKMNP-Z2-9]{6}$/);
+    }
+  });
+
+  test("correct code adds the user as a volunteer (case and spaces ignored)", async () => {
+    const add = mock.method(Event, "updateOne", async () => ({}));
+    const userId = id();
+    await svc.joinAsVolunteer(event._id, userId, " k7x q9m ");
+    const [filter, update] = add.mock.calls[0].arguments;
+    assert.equal(filter._id, event._id);
+    assert.equal(update.$addToSet.volunteers, userId);
+  });
+
+  test("wrong or missing code is refused", async () => {
+    const add = mock.method(Event, "updateOne", async () => ({}));
+    await rejectsWith(svc.joinAsVolunteer(event._id, id(), "K7XQ9N"), 403, /Incorrect/);
+    await rejectsWith(svc.joinAsVolunteer(event._id, id(), ""), 403);
+    await rejectsWith(svc.joinAsVolunteer(event._id, id(), undefined), 403);
+    assert.equal(add.mock.callCount(), 0);
+  });
+
+  test("existing volunteers don't need the code again", async () => {
+    const userId = id();
+    event.volunteers = [userId];
+    const add = mock.method(Event, "updateOne", async () => ({}));
+    await svc.joinAsVolunteer(event._id, userId, "nope");
+    assert.equal(add.mock.callCount(), 0);
+  });
+
+  test("HAB can set its own code or generate one", async () => {
+    mock.method(Event, "findByIdAndUpdate", async (_id, update) => ({
+      volunteerCode: update.$set.volunteerCode,
+    }));
+    assert.equal(await svc.setVolunteerCode(event._id, " fest 2026 "), "FEST2026");
+    assert.match(await svc.setVolunteerCode(event._id), /^[A-HJKMNP-Z2-9]{6}$/);
+    await rejectsWith(svc.setVolunteerCode(event._id, "ab"), 400);
+    await rejectsWith(svc.setVolunteerCode(event._id, "no-dashes!"), 400);
+  });
+
+  test("the code is never part of the student view", () => {
+    const view = svc.toStudentEvent(event, null, id());
+    assert.equal("volunteerCode" in view, false);
+    assert.equal(JSON.stringify(view).includes("K7XQ9M"), false);
   });
 });

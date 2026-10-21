@@ -156,6 +156,15 @@ class EventsApi {
     return CampusEvent.fromJson(response.data['event'] as Map<String, dynamic>);
   }
 
+  /// Unlocks the volunteer tab for this event using its access code.
+  Future<CampusEvent> joinAsVolunteer(String eventId, String code) async {
+    final response = await _dio.post(
+      EventEndpoints.joinAsVolunteer(eventId),
+      data: {'code': code},
+    );
+    return CampusEvent.fromJson(response.data['event'] as Map<String, dynamic>);
+  }
+
   Future<CheckInResult> checkIn(String eventId, String qrPayload) async {
     try {
       final response = await _dio.post(

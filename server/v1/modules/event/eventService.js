@@ -2,7 +2,7 @@ import crypto from "crypto";
 import mongoose from "mongoose";
 
 import AppError from "../../utils/appError.js";
-import { Event } from "./eventModel.js";
+import { Event, generateVolunteerCode } from "./eventModel.js";
 import { EventRegistration } from "./eventRegistrationModel.js";
 
 // Entry QR payload: "habit-event:<eventId>:<qrToken>"
@@ -251,6 +251,53 @@ export async function checkIn(eventId, volunteerId, payload, now = new Date()) {
     throw new AppError(404, "No approved registration found for this QR");
   }
   return { status: "already_checked_in", registration: existing };
+}
+
+function normalizeCode(code) {
+  return String(code ?? "").replace(/\s+/g, "").toUpperCase();
+}
+
+/** Adds the user as a volunteer if `code` matches the event's access code. */
+export async function joinAsVolunteer(eventId, userId, code) {
+  assertObjectId(eventId, "event id");
+  const event = await Event.findById(eventId);
+  if (!event || !event.isPublished) throw new AppError(404, "Event not found");
+  if (isVolunteer(event, userId)) return event;
+
+  const given = Buffer.from(normalizeCode(code));
+  const expected = Buffer.from(normalizeCode(event.volunteerCode));
+  if (
+    !expected.length ||
+    given.length !== expected.length ||
+    !crypto.timingSafeEqual(given, expected)
+  ) {
+    throw new AppError(403, "Incorrect access code");
+  }
+
+  await Event.updateOne({ _id: eventId }, { $addToSet: { volunteers: userId } });
+  return event;
+}
+
+/**
+ * Sets the event's shared volunteer code: HAB's own `code` if given
+ * (4-20 letters/digits), otherwise a newly generated one.
+ */
+export async function setVolunteerCode(eventId, code) {
+  assertObjectId(eventId, "event id");
+  let volunteerCode = generateVolunteerCode();
+  if (code !== undefined && code !== null && String(code).trim() !== "") {
+    volunteerCode = normalizeCode(code);
+    if (!/^[A-Z0-9]{4,20}$/.test(volunteerCode)) {
+      throw new AppError(400, "Access code must be 4-20 letters or digits");
+    }
+  }
+  const event = await Event.findByIdAndUpdate(
+    eventId,
+    { $set: { volunteerCode } },
+    { new: true },
+  );
+  if (!event) throw new AppError(404, "Event not found");
+  return event.volunteerCode;
 }
 
 export async function getCheckInStats(eventId) {

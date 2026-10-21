@@ -141,6 +141,14 @@ export const getVolunteerStats = handle("getVolunteerStats", async (req, res) =>
   return res.json(await eventService.getCheckInStats(event._id));
 });
 
+export const joinAsVolunteer = handle("joinAsVolunteer", async (req, res) => {
+  await eventService.joinAsVolunteer(req.params.eventId, req.user._id, req.body?.code);
+  return res.json({
+    message: "You're now a volunteer for this event",
+    event: await loadStudentEvent(req.params.eventId, req.user),
+  });
+});
+
 // ---------- HAB ----------
 
 export const adminListEvents = handle("adminListEvents", async (req, res) => {
@@ -267,6 +275,15 @@ export const adminRejectRegistration = handle(
     return res.json({ message: "Registration rejected", status: reg.status });
   },
 );
+
+/** Body: { code?: string }. Omit `code` to generate a new random one. */
+export const adminSetVolunteerCode = handle("adminSetVolunteerCode", async (req, res) => {
+  const volunteerCode = await eventService.setVolunteerCode(
+    req.params.eventId,
+    req.body?.code,
+  );
+  return res.json({ message: "Volunteer access code updated", volunteerCode });
+});
 
 /** Replaces the volunteer list. Body: { rollNumbers: string[] } */
 export const adminSetVolunteers = handle("adminSetVolunteers", async (req, res) => {

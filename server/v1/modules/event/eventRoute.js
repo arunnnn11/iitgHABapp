@@ -1,4 +1,5 @@
 import express from "express";
+import rateLimit from "express-rate-limit";
 
 import {
   authenticateJWT,
@@ -21,9 +22,21 @@ import {
   adminApproveRegistration,
   adminRejectRegistration,
   adminSetVolunteers,
+  joinAsVolunteer,
+  adminSetVolunteerCode,
 } from "./eventController.js";
 
 const eventRouter = express.Router();
+
+// Slows down guessing volunteer access codes: 10 tries per user per 15 minutes.
+const volunteerCodeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  keyGenerator: (req) => String(req.user._id),
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Too many attempts. Try again in a few minutes." },
+});
 
 // HAB (static /admin paths before /:eventId)
 eventRouter.get("/admin", authenticateHabJWT, adminListEvents);
@@ -47,6 +60,11 @@ eventRouter.post(
   adminRejectRegistration,
 );
 eventRouter.put(
+  "/admin/:eventId/volunteer-code",
+  authenticateHabJWT,
+  adminSetVolunteerCode,
+);
+eventRouter.put(
   "/admin/:eventId/volunteers",
   authenticateHabJWT,
   adminSetVolunteers,
@@ -59,6 +77,12 @@ eventRouter.post("/:eventId/register", authenticateJWT, registerForEvent);
 eventRouter.delete("/:eventId/register", authenticateJWT, cancelEventRegistration);
 
 // App: volunteers
+eventRouter.post(
+  "/:eventId/volunteer",
+  authenticateJWT,
+  volunteerCodeLimiter,
+  joinAsVolunteer,
+);
 eventRouter.post("/:eventId/check-in", authenticateJWT, checkInAttendee);
 eventRouter.get("/:eventId/check-in/stats", authenticateJWT, getVolunteerStats);
 

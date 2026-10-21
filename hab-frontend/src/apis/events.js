@@ -34,3 +34,6 @@ export const rejectRegistration = (id, regId) =>
   request(`/admin/${id}/registrations/${regId}/reject`, { method: "POST" });
 export const setVolunteers = (id, rollNumbers) =>
   request(`/admin/${id}/volunteers`, { method: "PUT", body: { rollNumbers } });
+// Omit `code` to generate a random one.
+export const setVolunteerCode = (id, code) =>
+  request(`/admin/${id}/volunteer-code`, { method: "PUT", body: { code } });
