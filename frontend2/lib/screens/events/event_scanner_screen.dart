@@ -135,7 +135,8 @@ class _EventScannerScreenState extends State<EventScannerScreen> {
                 if (_result != null)
                   Align(
                     alignment: Alignment.bottomCenter,
-                    child: _ResultPanel(result: _result!, onNext: _scanNext),
+                    child:
+                        CheckInResultPanel(result: _result!, onNext: _scanNext),
                   ),
               ],
             ),
@@ -173,8 +174,9 @@ class _EventScannerScreenState extends State<EventScannerScreen> {
   }
 }
 
-class _ResultPanel extends StatelessWidget {
-  const _ResultPanel({required this.result, required this.onNext});
+class CheckInResultPanel extends StatelessWidget {
+  const CheckInResultPanel(
+      {super.key, required this.result, required this.onNext});
 
   final CheckInResult result;
   final VoidCallback onNext;
@@ -261,12 +263,10 @@ class _ResultPanel extends StatelessWidget {
                       ),
                       if (attendee.rollNumber.isNotEmpty)
                         Text(attendee.rollNumber,
-                            style:
-                                const TextStyle(color: AppUi.textSecondary)),
+                            style: const TextStyle(color: AppUi.textSecondary)),
                       if (attendee.hostelName != null)
                         Text(attendee.hostelName!,
-                            style:
-                                const TextStyle(color: AppUi.textSecondary)),
+                            style: const TextStyle(color: AppUi.textSecondary)),
                     ],
                   ),
                 ),
